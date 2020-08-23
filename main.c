@@ -8,6 +8,21 @@
 void DSPCorrelateCoefs(short* source, int samples, short* coefs);
 void DSPEncodeFrame(short* source, int samples, unsigned char* dest, short* coefs);
 
+#ifdef WIN32
+uint32_t __builtin_bswap32(uint32_t value) {
+    return (uint32_t)(((value << 24) & 0xff000000u) |
+                      ((value << 8) & 0x00ff0000u) |
+                      ((value >> 8) & 0x0000ff00u) |
+                      ((value >> 24) & 0x000000ffu));
+}
+uint16_t __builtin_bswap16(uint16_t value) {
+    return (uint16_t)(((value << 8) & 0xff00u) | ((value >> 8) & 0xffu));
+}
+
+#define __BYTE_ORDER__ (REG_DWORD == REG_DWORD_LITTLE_ENDIAN ? 0 : 1)
+#define __ORDER_BIG_ENDIAN__ 1
+#endif
+
 #define MIN(a,b) (((a)<(b))?(a):(b))
 
 #define VOTE_ALLOC_COUNT 1024
@@ -245,7 +260,8 @@ int main(int argc, char** argv)
         fprintf(stderr, "'%s' won't open - %s\n", argv[2], strerror(errno));
         return 1;
     }
-    struct dspadpcm_header header = {};
+    struct dspadpcm_header header;
+    memset(&header, 0, sizeof(header));
 #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
     header.num_samples = samplecount;
     header.num_nibbles = GetNibbleFromSample(samplecount);
@@ -266,7 +282,9 @@ int main(int argc, char** argv)
         header.coef[i] = __builtin_bswap16(coefs[i]);
 #endif
 
+#ifndef WIN32
     printf("\e[?25l"); /* hide the cursor */
+#endif
 
     /* Execute encoding-predictor for each block */
     int16_t convSamps[16] = {0};
@@ -308,7 +326,9 @@ int main(int argc, char** argv)
     }
     printf("\rPREDICT [ %d / %d ]          ", p, packetCount);
     printf("\nDONE! %d samples processed\n", samplecount);
+#ifndef WIN32
     printf("\e[?25h"); /* show the cursor */
+#endif
 
     //printf("ERROR: %ld\n", ERROR_AVG / ERROR_SAMP_COUNT);
 
